@@ -1,83 +1,93 @@
 #include "stm32f0xx.h"
 #include <stdio.h>
 
-const int RED = 0x1;
-const int GREEN = 0x2;
-const int BLUE = 0x4;
-const int WHITE = 0x7;
-const int BLACK = 0x0;
-const int YELLOW = 0x3;
-const int PURPLE = 0x5;
-const int TEAL = 0x6;
+#define RED 0x1
+#define GREEN 0x2
+#define BLUE 0x4
+#define WHITE 0x7
+#define BLACK 0x0
+#define YELLOW 0x3
+#define PURPLE 0x5
+#define TEAL 0x6
 
-const int NONE = 0;
-const int PAWN = 1;
-const int ROOK = 2;
-const int KNIGHT = 3;
-const int BISHOP = 4;
-const int QUEEN = 5;
-const int KING = 6;
+#define NONE 0
+#define PAWN 1
+#define ROOK 2
+#define KNIGHT 3
+#define BISHOP 4
+#define QUEEN 5
+#define KING 6
 
-int timer = 60; // Time in seconds
+int timer0 = 0; // Time in seconds
+int timer1 = 0;
 int init = 1;
 int hold = 0;
+int sX = 9;
+int sY = 9;
+int dX = 9;
+int dY = 9;
 
- int pieces[7][8][8] = {{{0,0,0,0,0,0,0,0},         // None
-                         {0,0,0,0,0,0,0,0},
-                         {0,0,0,0,0,0,0,0},
-                         {0,0,0,0,0,0,0,0},
-                         {0,0,0,0,0,0,0,0},
-                         {0,0,0,0,0,0,0,0},
-                         {0,0,0,0,0,0,0,0},
+int confirm = 0;
+int undo = 0;
+int conDeny = 0;
+int playerTurn = 0;
+
+int pieces[7][8][8] = {{{0,0,0,0,0,0,0,0},         // None
+                        {0,0,0,0,0,0,0,0},
+                        {0,0,0,0,0,0,0,0},
+                        {0,0,0,0,0,0,0,0},
+                        {0,0,0,0,0,0,0,0},
+                        {0,0,0,0,0,0,0,0},
+                        {0,0,0,0,0,0,0,0},
+                        {0,0,0,0,0,0,0,0}},
+                    {{0,0,0,0,0,0,0,0},            // Pawn
+                     {0,0,0,0,0,0,0,0},
+                     {0,0,0,0,0,0,0,0},
+                     {0,0,0,1,1,0,0,0},
+                     {0,0,0,1,1,0,0,0},
+                     {0,0,1,1,1,1,0,0},
+                     {0,0,1,1,1,1,0,0},
+                     {0,0,0,0,0,0,0,0}},
+                        {{0,0,0,0,0,0,0,0},        // Rook
+                         {0,0,1,1,1,1,0,0},
+                         {0,0,0,1,1,0,0,0},
+                         {0,0,0,1,1,0,0,0},
+                         {0,0,0,1,1,0,0,0},
+                         {0,0,1,1,1,1,0,0},
+                         {0,1,1,1,1,1,1,0},
                          {0,0,0,0,0,0,0,0}},
-                     {{0,0,0,0,0,0,0,0},            // Pawn
-                      {0,0,0,0,0,0,0,0},
-                      {0,0,0,0,0,0,0,0},
-                      {0,0,0,1,1,0,0,0},
-                      {0,0,0,1,1,0,0,0},
-                      {0,0,1,1,1,1,0,0},
-                      {0,0,1,1,1,1,0,0},
-                      {0,0,0,0,0,0,0,0}},
-                         {{0,0,0,0,0,0,0,0},        // Rook
-                          {0,0,1,1,1,1,0,0},
-                          {0,0,0,1,1,0,0,0},
-                          {0,0,0,1,1,0,0,0},
-                          {0,0,0,1,1,0,0,0},
-                          {0,0,1,1,1,1,0,0},
-                          {0,1,1,1,1,1,1,0},
-                          {0,0,0,0,0,0,0,0}},
-                     {{0,0,0,0,0,0,0,0},            // Knight
-                      {0,0,1,1,0,0,0,0},
-                      {0,0,1,1,1,0,0,0},
-                      {0,0,1,1,1,1,0,0},
-                      {0,0,1,1,0,0,0,0},
-                      {0,0,1,1,1,1,0,0},
-                      {0,1,1,1,1,1,1,0},
-                      {0,0,0,0,0,0,0,0}},
-                         {{0,0,0,0,0,0,0,0},        // Bishop
-                          {0,0,0,1,1,0,0,0},
-                          {0,0,1,1,1,1,0,0},
-                          {0,0,0,1,1,0,0,0},
-                          {0,0,0,1,1,0,0,0},
-                          {0,0,1,1,1,1,0,0},
-                          {0,1,1,1,1,1,1,0},
-                          {0,0,0,0,0,0,0,0}},
-                     {{0,0,0,0,0,0,0,0},            // Queen
-                      {0,1,0,1,1,0,1,0},
-                      {0,1,1,0,0,1,1,0},
-                      {0,0,1,1,1,1,0,0},
-                      {0,0,0,1,1,0,0,0},
-                      {0,0,1,1,1,1,0,0},
-                      {0,1,1,1,1,1,1,0},
-                      {0,0,0,0,0,0,0,0}},
-                         {{0,0,0,0,0,0,0,0},        // King
-                          {0,1,0,1,1,0,1,0},
-                          {0,1,1,1,1,1,1,0},
-                          {0,0,0,1,1,0,0,0},
-                          {0,0,0,1,1,0,0,0},
-                          {0,0,1,1,1,1,0,0},
-                          {0,1,1,1,1,1,1,0},
-                          {0,0,0,0,0,0,0,0}}};
+                    {{0,0,0,0,0,0,0,0},            // Knight
+                     {0,0,1,1,0,0,0,0},
+                     {0,0,1,1,1,0,0,0},
+                     {0,0,1,1,1,1,0,0},
+                     {0,0,1,1,0,0,0,0},
+                     {0,0,1,1,1,1,0,0},
+                     {0,1,1,1,1,1,1,0},
+                     {0,0,0,0,0,0,0,0}},
+                        {{0,0,0,0,0,0,0,0},        // Bishop
+                         {0,0,0,1,1,0,0,0},
+                         {0,0,1,1,1,1,0,0},
+                         {0,0,0,1,1,0,0,0},
+                         {0,0,0,1,1,0,0,0},
+                         {0,0,1,1,1,1,0,0},
+                         {0,1,1,1,1,1,1,0},
+                         {0,0,0,0,0,0,0,0}},
+                    {{0,0,0,0,0,0,0,0},            // Queen
+                     {0,1,0,1,1,0,1,0},
+                     {0,1,1,0,0,1,1,0},
+                     {0,0,1,1,1,1,0,0},
+                     {0,0,0,1,1,0,0,0},
+                     {0,0,1,1,1,1,0,0},
+                     {0,1,1,1,1,1,1,0},
+                     {0,0,0,0,0,0,0,0}},
+                        {{0,0,0,0,0,0,0,0},        // King
+                         {0,1,0,1,1,0,1,0},
+                         {0,1,1,1,1,1,1,0},
+                         {0,0,0,1,1,0,0,0},
+                         {0,0,0,1,1,0,0,0},
+                         {0,0,1,1,1,1,0,0},
+                         {0,1,1,1,1,1,1,0},
+                         {0,0,0,0,0,0,0,0}}};
 
 typedef struct {
     int player;
@@ -132,6 +142,23 @@ void enablePorts()
 
     // Enable GPIOC
     RCC->AHBENR |= RCC_AHBENR_GPIOCEN;
+
+    // Enable USART1
+    GPIOA->MODER &= ~(0xF<<18);
+    GPIOA->MODER |= 0xA<<18;
+    GPIOA->AFR[1] |= 17 << 4;
+    RCC->APB2ENR |= 1 << 14;
+    USART1->CR1 &= ~USART_CR1_UE;                       //USART Disable
+    USART1->CR1 &= ~USART_CR1_M ;                       //Word Size of 8
+    USART1->CR2 &= ~USART_CR2_STOP;                     //One stop bit
+    USART1->CR1 &= ~USART_CR1_PCE;                      //No parity
+    USART1->CR1 &= ~USART_CR1_OVER8;                    //16x oversampling
+    USART1->BRR = 0x1A1;                                //baud rate of 115200
+    USART1->CR1 |= (USART_CR1_TE | USART_CR1_RE);       //TE enable RE enable
+    USART1->CR1 |= USART_CR1_UE;                        //USART enable
+
+    while ((USART1->ISR & USART_ISR_TEACK) == 0) { }
+    while ((USART1->ISR & USART_ISR_REACK) == 0) { }
 }
 
 void config_buttons()
@@ -148,14 +175,38 @@ void config_buttons()
     NVIC->ISER[0] |= 1 << EXTI4_15_IRQn;
 }
 
-// Reset Button
+void sendRecord()
+{
+    USART1->TDR = 0x00;
+    while((USART1->ISR & 0x40) >> 6 != 1);
+}
+
+void sendShutdown()
+{
+    USART1->TDR = 0x40;
+    while((USART1->ISR & 0x40) >> 6 != 1);
+}
+
+void sendByte(int byteToSend)
+{
+    USART1->TDR = byteToSend & 0xFF;
+    while((USART1->ISR & 0x40) >> 6 != 1);
+}
+
+int pressNo = 0;
+
+// Record Button
 void EXTI0_1_IRQHandler()
 {
-
     EXTI->PR |= EXTI_PR_PR0;
     if (hold == 0)
     {
-
+        if (conDeny)
+        {
+            undo = 1;
+            conDeny = 0;
+        }
+        sendRecord();
     }
     hold = 1;
 }
@@ -168,6 +219,13 @@ void EXTI2_3_IRQHandler()
     {
         if (init == 1)
             init = 0;
+        else
+            if (conDeny)
+            {
+                confirm = 1;
+                conDeny = 0;
+                playerTurn = !playerTurn;
+            }
     }
     hold = 1;
 }
@@ -179,13 +237,19 @@ void EXTI4_15_IRQHandler()
     {
         if(((EXTI->PR & (0x1 << 13)) >> 13) == 1)
         {
-            if (timer < 99 * 60)
-                timer = timer + 60;
+            if (timer0 < 99 * 60)
+            {
+                timer0 = timer0 + 60;
+                timer1 = timer1 + 60;
+            }
         }
         else if (((EXTI->PR & (0x1 << 10)) >> 10) == 1)
         {
-            if (timer >= 60)
-                timer = timer - 60;
+            if (timer0 >= 60)
+            {
+                timer0 = timer0 - 60;
+                timer1 = timer1 - 60;
+            }
         }
     }
     hold = 1;
@@ -266,6 +330,7 @@ void init_tim6(void)
 
     // Enable interrupt
     TIM6->DIER |= TIM_DIER_UIE;
+    NVIC_SetPriority(TIM6_DAC_IRQn, 1);
     NVIC->ISER[0] |= 1 << TIM6_DAC_IRQn;
 
     // Enable timer
@@ -279,10 +344,11 @@ void init_tim7(void)
 
     // Set rate to 10 Hz
     TIM7->PSC = 10-1;
-    TIM7->ARR = 480000-1;
+    TIM7->ARR = 4800000-1;
 
     // Enable interrupt
     TIM7->DIER |= TIM_DIER_UIE;
+    NVIC_SetPriority(TIM7_IRQn, 1);
     NVIC->ISER[0] |= 1 << TIM7_IRQn;
 
     // Enable timer
@@ -292,13 +358,59 @@ void init_tim7(void)
 void TIM6_DAC_IRQHandler() // LCD TEXT DISPLAY
 {
     TIM6->SR &= ~TIM_SR_UIF;
-    if (timer >= 0) {
-        write_time_to_feedback_display(timer, "top", "left");
-        write_time_to_feedback_display(timer, "top", "right");
-        if (!init)
-            timer--;
+    if (!playerTurn)
+    {
+        if (timer0 >= 0)
+        {
+            write_time_to_feedback_display(timer0, "top", "left");
+            write_time_to_feedback_display(timer1, "top", "right");
+            if (!init)
+                timer0--;
+        }
+    }
+    else
+    {
+        if (timer1 >= 0)
+        {
+            write_time_to_feedback_display(timer0, "top", "left");
+            write_time_to_feedback_display(timer1, "top", "right");
+            if (!init)
+                timer1--;
+        }
     }
     hold = 0;
+
+    if(sX < 8 && sY < 8 && dX < 8 && dY < 8)
+        requestConfirm();
+
+    if (confirm)
+    {
+        movePiece(sX, 7-sY, dX, 7-dY);
+        sX = 9;
+        sY = 9;
+        dX = 9;
+        dY = 9;
+        write_to_feedback_display("                ", "bottom", "center");
+    }
+    else if (undo)
+    {
+        sX = 9;
+        sY = 9;
+        dX = 9;
+        dY = 9;
+        write_to_feedback_display("                ", "bottom", "center");
+    }
+
+    confirm = 0;
+    undo = 0;
+}
+
+char command[16];
+void requestConfirm()
+{
+    sprintf(command, "%d,%d to %d,%d", sX+1, sY+1, dX+1, dY+1);
+    write_to_feedback_display(command, "bottom", "center");
+    conDeny = 1;
 }
 
 void TIM7_IRQHandler() // LED DISPLAY
@@ -310,6 +422,38 @@ void TIM7_IRQHandler() // LED DISPLAY
     }
     else
         sendBlack();
+}
+
+void enable_UART_interrupt() {
+    USART1->CR1 |= USART_CR1_RXNEIE;
+    NVIC_SetPriority(USART1_IRQn, 0);
+    NVIC->ISER[0] |= (1 << USART1_IRQn);
+}
+
+void USART1_IRQHandler() {
+    int signal = USART1->RDR & 0xFF;
+    int code = signal >> 6;
+    int X = (signal >> 3) & 0x7;
+    int Y = signal & 0x7;
+
+    if (code == 0)
+    {
+        sX = X;
+        sY = Y;
+    }
+    else if (code == 1)
+    {
+        dX = X;
+        dY = Y;
+    }
+    else if (code == 2)
+    {
+        //ready();
+    }
+    else if (code == 3)
+    {
+        //notReady();
+    }
 }
 
 void clear_feedback_display()
@@ -548,13 +692,13 @@ void sendBoard()
     }
 }
 
-void movePiece (int sx, int sy, int ex, int ey)
+void movePiece (int bx, int by, int ex, int ey)
 {
-    board[ex][ey].piece = board[sx][sy].piece;
-    board[sx][sy].piece = NONE;
+    board[ey][ex].piece = board[by][bx].piece;
+    board[by][bx].piece = NONE;
 
-    board[ex][ey].player = board[sx][sy].player;
-    board[sx][sy].player = NONE;
+    board[ey][ex].player = board[by][bx].player;
+    board[by][bx].player = NONE;
 }
 
 int main(void)
@@ -567,7 +711,7 @@ int main(void)
     init_tim6();
     init_tim7();
     config_buttons();
-    write_to_feedback_display("A5 to B6", "bottom", "center");
+    enable_UART_interrupt();
     initBoard();
 
 	while(1)
