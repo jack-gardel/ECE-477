@@ -23,8 +23,8 @@ typedef struct {
     int piece;
 } tile;
 
-void send_board();
-void send_black();
+void write_board();
+void write_blank_board();
 void move_piece (int bx, int by, int ex, int ey);
 void setup_board();
 

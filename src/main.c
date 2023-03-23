@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "feedback-display.h"
 #include "board.h"
+#include "uart-jetson.h"
 
 int timer0 = 0; // Time in seconds
 int timer1 = 0;
@@ -22,23 +23,6 @@ void enable_ports()
 {
     // Enable GPIOC
     RCC->AHBENR |= RCC_AHBENR_GPIOCEN;
-
-    // Enable USART1
-    GPIOA->MODER &= ~(0xF<<18);
-    GPIOA->MODER |= 0xA<<18;
-    GPIOA->AFR[1] |= 17 << 4;
-    RCC->APB2ENR |= 1 << 14;
-    USART1->CR1 &= ~USART_CR1_UE;                       //USART Disable
-    USART1->CR1 &= ~USART_CR1_M ;                       //Word Size of 8
-    USART1->CR2 &= ~USART_CR2_STOP;                     //One stop bit
-    USART1->CR1 &= ~USART_CR1_PCE;                      //No parity
-    USART1->CR1 &= ~USART_CR1_OVER8;                    //16x oversampling
-    USART1->BRR = 0x1A1;                                //baud rate of 115200
-    USART1->CR1 |= (USART_CR1_TE | USART_CR1_RE);       //TE enable RE enable
-    USART1->CR1 |= USART_CR1_UE;                        //USART enable
-
-    while ((USART1->ISR & USART_ISR_TEACK) == 0) { }
-    while ((USART1->ISR & USART_ISR_REACK) == 0) { }
 }
 
 void config_buttons()
@@ -55,23 +39,6 @@ void config_buttons()
     NVIC->ISER[0] |= 1 << EXTI4_15_IRQn;
 }
 
-void sendRecord()
-{
-    USART1->TDR = 0x00;
-    while((USART1->ISR & 0x40) >> 6 != 1);
-}
-
-void sendShutdown()
-{
-    USART1->TDR = 0x40;
-    while((USART1->ISR & 0x40) >> 6 != 1);
-}
-
-void sendByte(int byteToSend)
-{
-    USART1->TDR = byteToSend & 0xFF;
-    while((USART1->ISR & 0x40) >> 6 != 1);
-}
 
 int pressNo = 0;
 
@@ -86,7 +53,7 @@ void EXTI0_1_IRQHandler()
             undo = 1;
             conDeny = 0;
         }
-        sendRecord();
+        send_record();
     }
     hold = 1;
 }
@@ -212,6 +179,7 @@ void TIM6_DAC_IRQHandler() // LCD TEXT DISPLAY
         dX = 9;
         dY = 9;
         write_to_feedback_display("                ", "bottom", "center");
+        send_confirm();
     }
     else if (undo)
     {
@@ -239,16 +207,10 @@ void TIM7_IRQHandler() // LED DISPLAY
     TIM7->SR &= ~TIM_SR_UIF;
     if(init == 0)
     {
-        send_board();
+        write_board();
     }
     else
-        send_black();
-}
-
-void enable_UART_interrupt() {
-    USART1->CR1 |= USART_CR1_RXNEIE;
-    NVIC_SetPriority(USART1_IRQn, 0);
-    NVIC->ISER[0] |= (1 << USART1_IRQn);
+        write_blank_board();
 }
 
 void USART1_IRQHandler() {
@@ -281,11 +243,11 @@ int main(void)
 {
     setup_feedback_display();
     setup_board();
+    setup_uart_jetson();
     enable_ports();
     init_tim6();
     init_tim7();
     config_buttons();
-    enable_UART_interrupt();
 
     while(1)
     {

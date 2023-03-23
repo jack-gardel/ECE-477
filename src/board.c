@@ -124,7 +124,7 @@ void init_board()
     board[7][7].piece = ROOK;
 }
 
-void send_board()
+void write_board()
 {
     int out;
     int out1;
@@ -208,7 +208,7 @@ void send_board()
     }
 }
 
-void send_black()
+void write_blank_board()
 {
     GPIOB->BRR = 0xFFFF;
     for (int i = 0; i < 64; i++)
