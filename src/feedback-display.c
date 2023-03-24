@@ -17,14 +17,14 @@ char *time_to_string(int time_int)
 {
     // Convert a given time integer to string format
 
-    int mins = time_int / 60;
-    int secs = time_int % 60;
+    int mins = (time_int / timerPrec) / 60;
+    int secs = (time_int / timerPrec) % 60;
 
     char *time_str = malloc(sizeof(char) * 8); // Space for 00:00.0
     if (mins >= 10)
         sprintf(time_str, "%d:%02d", mins, secs);
     else
-        sprintf(time_str, "0%d:%02d", mins, secs);
+        sprintf(time_str, "%02d:%02d", mins, secs);
 
     return time_str;
 }
@@ -40,6 +40,20 @@ void write_time_to_feedback_display(int time, char *align_vertical, char *align_
 
     free(time_str);
     free(prev_time_str);
+}
+
+void write_move_to_feedback_display(int sX, int sY, int dX, int dY,
+                                    char *align_vertical, char *align_horizontal)
+{
+    // sX, sY: Source X and Y coordinates
+    // dX, dY: Destination X and Y coordinates
+
+    char sFile = (char) (sX + 65);
+    char dFile = (char) (dX + 65);
+
+    char command[16];
+    sprintf(command, "%c%d to %c%d", sFile, sY+1, dFile, dY+1);
+    write_to_feedback_display(command, align_vertical, align_horizontal);
 }
 
 void write_to_feedback_display(char *text, char *align_vertical, char *align_horizontal)

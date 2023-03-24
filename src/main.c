@@ -1,22 +1,28 @@
 #include "stm32f0xx.h"
 #include <stdio.h>
+#include <stdbool.h>
 #include "feedback-display.h"
 #include "board.h"
 #include "uart-jetson.h"
 
+#define PLAYER_WHITE true
+#define PLAYER_BLACK false
+
 int timer0 = 0; // Time in seconds
 int timer1 = 0;
-int init = 1;
-int hold = 0;
+timerPrec = 1; // Timer precision
+
+bool init = true;
+bool hold = false;
 int sX = 9;
 int sY = 9;
 int dX = 9;
 int dY = 9;
 
-int confirm = 0;
-int undo = 0;
-int conDeny = 0;
-int playerTurn = 0;
+bool confirm = false;
+bool undo = false;
+bool conDeny = false;
+bool playerTurn = PLAYER_WHITE;
 
 
 void enable_ports()
@@ -40,66 +46,64 @@ void config_buttons()
 }
 
 
-int pressNo = 0;
-
 // Record Button
 void EXTI0_1_IRQHandler()
 {
     EXTI->PR |= EXTI_PR_PR0;
-    if (hold == 0)
+    if (!hold)
     {
         if (conDeny)
         {
-            undo = 1;
-            conDeny = 0;
+            undo = true;
+            conDeny = false;
         }
         send_record();
     }
-    hold = 1;
+    hold = true;
 }
 
 // Confirm Button
 void EXTI2_3_IRQHandler()
 {
     EXTI->PR |= EXTI_PR_PR3;
-    if (hold == 0)
+    if (!hold)
     {
-        if (init == 1)
-            init = 0;
+        if (init)
+            init = false;
         else
             if (conDeny)
             {
-                confirm = 1;
-                conDeny = 0;
+                confirm = true;
+                conDeny = false;
                 playerTurn = !playerTurn;
             }
     }
-    hold = 1;
+    hold = true;
 }
 
 // Timer Up/Down Button
 void EXTI4_15_IRQHandler()
 {
-    if(init == 1 && hold == 0)
+    if(init && !hold)
     {
         if(((EXTI->PR & (0x1 << 13)) >> 13) == 1)
         {
-            if (timer0 < 99 * 60)
+            if (timer0 < 99 * 60 * timerPrec)
             {
-                timer0 = timer0 + 60;
-                timer1 = timer1 + 60;
+                timer0 = timer0 + 60 * timerPrec;
+                timer1 = timer1 + 60 * timerPrec;
             }
         }
         else if (((EXTI->PR & (0x1 << 10)) >> 10) == 1)
         {
-            if (timer0 >= 60)
+            if (timer0 >= 60 * timerPrec)
             {
-                timer0 = timer0 - 60;
-                timer1 = timer1 - 60;
+                timer0 = timer0 - 60 * timerPrec;
+                timer1 = timer1 - 60 * timerPrec;
             }
         }
     }
-    hold = 1;
+    hold = true;
     EXTI->PR |= EXTI_PR_PR10 | EXTI_PR_PR13;
 }
 
@@ -108,9 +112,10 @@ void init_tim6(void)
     // Enable Clock
     RCC->APB1ENR |= RCC_APB1ENR_TIM6EN;
 
-    // Set rate to 1 Hz
+    // Set frequency
+    int freq = timerPrec; // Frequency (Hz)
     int psc = 4800;
-    int arr = (48000000/psc) / 1;
+    int arr = (48000000/psc) / freq;
     TIM6->PSC = psc-1;
     TIM6->ARR = arr-1;
 
@@ -128,11 +133,12 @@ void init_tim7(void)
     // Enable Clock
     RCC->APB1ENR |= RCC_APB1ENR_TIM7EN;
 
-    // Set rate to 1 Hz
+    // Set frequency
+    int freq = 150; // Frequency (Hz)
     int psc = 4800;
-    int arr = (48000000/psc) / 1;
-    TIM6->PSC = psc-1;
-    TIM6->ARR = arr-1;
+    int arr = (48000000/psc) / freq;
+    TIM7->PSC = psc-1;
+    TIM7->ARR = arr-1;
 
     // Enable interrupt
     TIM7->DIER |= TIM_DIER_UIE;
@@ -143,10 +149,17 @@ void init_tim7(void)
     TIM7->CR1 |= TIM_CR1_CEN;
 }
 
+char command[16];
+void requestConfirm()
+{
+    write_move_to_feedback_display(sX, sY, dX, dY, "bottom", "center");
+    conDeny = true;
+}
+
 void TIM6_DAC_IRQHandler() // LCD TEXT DISPLAY
 {
     TIM6->SR &= ~TIM_SR_UIF;
-    if (!playerTurn)
+    if (playerTurn == PLAYER_WHITE)
     {
         if (timer0 >= 0)
         {
@@ -166,7 +179,8 @@ void TIM6_DAC_IRQHandler() // LCD TEXT DISPLAY
                 timer1--;
         }
     }
-    hold = 0;
+
+    hold = false;
 
     if(sX < 8 && sY < 8 && dX < 8 && dY < 8)
         requestConfirm();
@@ -190,27 +204,21 @@ void TIM6_DAC_IRQHandler() // LCD TEXT DISPLAY
         write_to_feedback_display("                ", "bottom", "center");
     }
 
-    confirm = 0;
-    undo = 0;
-}
-
-char command[16];
-void requestConfirm()
-{
-    sprintf(command, "%d,%d to %d,%d", sX+1, sY+1, dX+1, dY+1);
-    write_to_feedback_display(command, "bottom", "center");
-    conDeny = 1;
+    confirm = false;
+    undo = false;
 }
 
 void TIM7_IRQHandler() // LED DISPLAY
 {
     TIM7->SR &= ~TIM_SR_UIF;
-    if(init == 0)
+    if(!init)
     {
         write_board();
     }
     else
         write_blank_board();
+
+//    hold = false;
 }
 
 void USART1_IRQHandler() {
