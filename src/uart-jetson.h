@@ -1,9 +1,11 @@
 #ifndef UART_JETSON
 #define UART_JETSON
 
-#define REC 0
-#define CFM 1
-#define SHTDWN 2
+#include <stdbool.h>
+
+enum Comm {REC, CFM, SHTDWN};
+
+extern bool ready;
 
 void send_byte(int byteToSend);
 void send_record();

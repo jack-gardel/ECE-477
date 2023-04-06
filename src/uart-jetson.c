@@ -20,6 +20,11 @@ void send_shutdown() {
     send_byte(SHTDWN << 6);
 }
 
+void wait_for_ready() {
+    while (!ready) {}
+    ready = !ready;
+}
+
 void setup_uart_jetson_gpio() {
     // Enable GPIOA
     RCC->AHBENR |= RCC_AHBENR_GPIOAEN;

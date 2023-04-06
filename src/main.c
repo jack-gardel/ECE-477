@@ -5,11 +5,9 @@
 #include "board.h"
 #include "uart-jetson.h"
 
-#define PLAYER_WHITE true
-#define PLAYER_BLACK false
+enum Player {PLAYER_WHITE, PLAYER_BLACK};
 
-int timer0 = 0; // Time in seconds
-int timer1 = 0;
+int timer[2];
 timerPrec = 1; // Timer precision
 
 bool init = true;
@@ -22,8 +20,11 @@ int dY = 9;
 bool confirm = false;
 bool undo = false;
 bool conDeny = false;
-bool playerTurn = PLAYER_WHITE;
+int playerTurn = PLAYER_WHITE;
 
+bool ready = false;
+
+int numPieceRecv = 0;
 
 void enable_ports()
 {
@@ -88,18 +89,18 @@ void EXTI4_15_IRQHandler()
     {
         if(((EXTI->PR & (0x1 << 13)) >> 13) == 1)
         {
-            if (timer0 < 99 * 60 * timerPrec)
+            if (timer[PLAYER_WHITE] < 99 * 60 * timerPrec)
             {
-                timer0 = timer0 + 60 * timerPrec;
-                timer1 = timer1 + 60 * timerPrec;
+                timer[PLAYER_WHITE] = timer[PLAYER_WHITE] + 60 * timerPrec;
+                timer[PLAYER_BLACK] = timer[PLAYER_BLACK] + 60 * timerPrec;
             }
         }
         else if (((EXTI->PR & (0x1 << 10)) >> 10) == 1)
         {
-            if (timer0 >= 60 * timerPrec)
+            if (timer[PLAYER_WHITE] >= 60 * timerPrec)
             {
-                timer0 = timer0 - 60 * timerPrec;
-                timer1 = timer1 - 60 * timerPrec;
+                timer[PLAYER_WHITE] = timer[PLAYER_WHITE] - 60 * timerPrec;
+                timer[PLAYER_BLACK] = timer[PLAYER_BLACK] - 60 * timerPrec;
             }
         }
     }
@@ -130,11 +131,14 @@ void init_tim6(void)
 
 void init_tim7(void)
 {
+    timer[PLAYER_WHITE] = (int) 600;
+    timer[PLAYER_BLACK] = (int) 600;
+
     // Enable Clock
     RCC->APB1ENR |= RCC_APB1ENR_TIM7EN;
 
     // Set frequency
-    int freq = 150; // Frequency (Hz)
+    int freq = 120; // Frequency (Hz)
     int psc = 4800;
     int arr = (48000000/psc) / freq;
     TIM7->PSC = psc-1;
@@ -161,22 +165,22 @@ void TIM6_DAC_IRQHandler() // LCD TEXT DISPLAY
     TIM6->SR &= ~TIM_SR_UIF;
     if (playerTurn == PLAYER_WHITE)
     {
-        if (timer0 >= 0)
+        if (timer[PLAYER_WHITE] >= 0)
         {
-            write_time_to_feedback_display(timer0, "top", "left");
-            write_time_to_feedback_display(timer1, "top", "right");
+            write_time_to_feedback_display(timer[PLAYER_WHITE], "top", "left");
+            write_time_to_feedback_display(timer[PLAYER_BLACK], "top", "right");
             if (!init)
-                timer0--;
+                timer[PLAYER_WHITE]--;
         }
     }
     else
     {
-        if (timer1 >= 0)
+        if (timer[PLAYER_BLACK] >= 0)
         {
-            write_time_to_feedback_display(timer0, "top", "left");
-            write_time_to_feedback_display(timer1, "top", "right");
+            write_time_to_feedback_display(timer[PLAYER_WHITE], "top", "left");
+            write_time_to_feedback_display(timer[PLAYER_BLACK], "top", "right");
             if (!init)
-                timer1--;
+                timer[PLAYER_BLACK]--;
         }
     }
 
@@ -187,7 +191,7 @@ void TIM6_DAC_IRQHandler() // LCD TEXT DISPLAY
 
     if (confirm)
     {
-        move_piece(sX, 7-sY, dX, 7-dY);
+        move_piece(sX, sY, dX, dY);
         sX = 9;
         sY = 9;
         dX = 9;
@@ -227,31 +231,43 @@ void USART1_IRQHandler() {
     int X = (signal >> 3) & 0x7;
     int Y = signal & 0x7;
 
-    if (code == 0)
-    {
-        sX = X;
-        sY = Y;
-    }
-    else if (code == 1)
-    {
-        dX = X;
-        dY = Y;
-    }
-    else if (code == 2)
+    if (code == 2)
     {
         //ready();
+        ready = true;
     }
     else if (code == 3)
     {
         //notReady();
     }
+    // Portotype code for setting up the board to a desired position
+    // for testing purposes
+    else if (init) {
+        // If in setup state, add received piece to board
+        add_piece_to_board(numPieceRecv++, signal);
+        if (numPieceRecv >= 64) {
+            numPieceRecv = 0;
+            write_to_feedback_display("Board received!", "bottom", "center");
+        }
+    } else {
+        if (code == 0)
+        {
+            sX = X;
+            sY = Y;
+        }
+        else if (code == 1)
+        {
+            dX = X;
+            dY = Y;
+        }
+    }
 }
 
 int main(void)
 {
+    setup_uart_jetson();
     setup_feedback_display();
     setup_board();
-    setup_uart_jetson();
     enable_ports();
     init_tim6();
     init_tim7();

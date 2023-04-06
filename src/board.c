@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 #include "stm32f0xx.h"
 #include "board.h"
 
@@ -23,16 +25,6 @@ int pieces[7][8][8] = {
         {0,0,1,1,1,1,0,0},
         {0,0,0,0,0,0,0,0}},
 
-        // Rook
-       {{0,0,0,0,0,0,0,0},
-        {0,0,1,1,1,1,0,0},
-        {0,0,0,1,1,0,0,0},
-        {0,0,0,1,1,0,0,0},
-        {0,0,0,1,1,0,0,0},
-        {0,0,1,1,1,1,0,0},
-        {0,1,1,1,1,1,1,0},
-        {0,0,0,0,0,0,0,0}},
-
         // Knight
        {{0,0,0,0,0,0,0,0},
         {0,0,1,1,0,0,0,0},
@@ -47,6 +39,16 @@ int pieces[7][8][8] = {
        {{0,0,0,0,0,0,0,0},
         {0,0,0,1,1,0,0,0},
         {0,0,1,1,1,1,0,0},
+        {0,0,0,1,1,0,0,0},
+        {0,0,0,1,1,0,0,0},
+        {0,0,1,1,1,1,0,0},
+        {0,1,1,1,1,1,1,0},
+        {0,0,0,0,0,0,0,0}},
+
+        // Rook
+       {{0,0,0,0,0,0,0,0},
+        {0,0,1,1,1,1,0,0},
+        {0,0,0,1,1,0,0,0},
         {0,0,0,1,1,0,0,0},
         {0,0,0,1,1,0,0,0},
         {0,0,1,1,1,1,0,0},
@@ -76,7 +78,7 @@ int pieces[7][8][8] = {
 
 tile board[8][8];
 
-void init_board()
+void init_board_default()
 {
     for (int a = 0; a < 8; a++)
     {
@@ -90,7 +92,7 @@ void init_board()
     {
         for (int b = 0; b < 8; b++)
         {
-            board[a][b].player = GREEN;
+            board[a][b].player = BLACK_PLAYER_COLOR;
             if (a == 1)
                 board[a][b].piece = PAWN;
         }
@@ -100,7 +102,7 @@ void init_board()
     {
         for (int b = 0; b < 8; b++)
         {
-            board[a][b].player = BLUE;
+            board[a][b].player = WHITE_PLAYER_COLOR;
             if (a == 6)
                 board[a][b].piece = PAWN;
         }
@@ -122,6 +124,52 @@ void init_board()
     board[7][5].piece = BISHOP;
     board[7][6].piece = KNIGHT;
     board[7][7].piece = ROOK;
+}
+
+void add_piece_to_board(int numPiece, char piece) {
+    int col = numPiece % 8;
+    int row = numPiece / 8;
+
+    switch (piece) {
+    case ('.'):
+        board[row][col].piece = NONE;
+        break;
+    case ('P'):
+    case ('p'):
+        board[row][col].piece = PAWN;
+        break;
+    case ('N'):
+    case ('n'):
+        board[row][col].piece = KNIGHT;
+        break;
+    case ('B'):
+    case ('b'):
+        board[row][col].piece = BISHOP;
+        break;
+    case ('R'):
+    case ('r'):
+        board[row][col].piece = ROOK;
+        break;
+    case ('Q'):
+    case ('q'):
+        board[row][col].piece = QUEEN;
+        break;
+    case ('K'):
+    case ('k'):
+        board[row][col].piece = KING;
+        break;
+    default:
+        break;
+    }
+
+    // White pieces
+    if (piece == 'P' || piece == 'N' || piece == 'B' || piece == 'R' || piece == 'Q' || piece == 'K')
+        board[row][col].player = WHITE_PLAYER_COLOR;
+    // Black pieces
+    else if (piece == 'p' || piece == 'n' || piece == 'b' || piece == 'r' || piece == 'q' || piece == 'k')
+        board[row][col].player = BLACK_PLAYER_COLOR;
+    else
+        board[row][col].player = NONE;
 }
 
 void write_board()
@@ -146,16 +194,16 @@ void write_board()
                 for (int l = 0; l < 8; l++) // Columns of pixels per tile
                 {
                     GPIOB->BRR = 0x3F << 5;
-                    if (board[i+4][k].player == GREEN)
+                    if (board[i+4][k].player == BLACK_PLAYER_COLOR)
                     {
                         if (pieces[board[i+4][k].piece][7-j][l] == 1)
                             out1 = board[i+4][k].player << 5;
                         else
                         {
                             if ((i + k) % 2 == 0)
-                                out1 = WHITE << 5;
+                                out1 = WHITE_TILE_COLOR << 5;
                             else
-                                out1 = BLACK << 5;
+                                out1 = BLACK_TILE_COLOR << 5;
                         }
                     }
                     else
@@ -165,21 +213,21 @@ void write_board()
                         else
                         {
                             if ((i + k) % 2 == 0)
-                                out1 = WHITE << 5;
+                                out1 = WHITE_TILE_COLOR << 5;
                             else
-                                out1 = BLACK << 5;
+                                out1 = BLACK_TILE_COLOR << 5;
                         }
                     }
-                    if (board[i][k].player == GREEN)
+                    if (board[i][k].player == BLACK_PLAYER_COLOR)
                     {
                         if (pieces[board[i][k].piece][7-j][l] == 1)
                             out2 = board[i][k].player << 8;
                         else
                         {
                             if ((i + k) % 2 == 0)
-                                out2 = WHITE << 8;
+                                out2 = WHITE_TILE_COLOR << 8;
                             else
-                                out2 = BLACK << 8;
+                                out2 = BLACK_TILE_COLOR << 8;
                         }
                     }
                     else
@@ -189,9 +237,9 @@ void write_board()
                         else
                         {
                             if ((i + k) % 2 == 0)
-                                out2 = WHITE << 8;
+                                out2 = WHITE_TILE_COLOR << 8;
                             else
-                                out2 = BLACK << 8;
+                                out2 = BLACK_TILE_COLOR << 8;
                         }
                     }
                     out = out2 | out1;
@@ -222,12 +270,45 @@ void write_blank_board()
     GPIOB->BRR = 0x1 << 13;
 }
 
-void move_piece (int bx, int by, int ex, int ey) {
-    board[ey][ex].piece = board[by][bx].piece;
-    board[by][bx].piece = NONE;
+void move_piece (int sCol, int sY, int dCol, int dY) {
+    int sRow = 7-sY;
+    int dRow = 7-dY;
 
-    board[ey][ex].player = board[by][bx].player;
-    board[by][bx].player = NONE;
+    // Promotion:
+    // Piece is pawn, current row is second last (1 or 6)
+    if (board[sRow][sCol].piece == PAWN && (sRow == 1 || sRow == 6)) {
+        // dY holds the promotion piece
+        board[sRow][sCol].piece = dY;
+        if (sRow == 1)  dRow = 0;
+        else            dRow = 7;
+    }
+
+    // En Passant:
+    // Piece is pawn, move is diagonal, and destination is empty
+    else if (board[sRow][sCol].piece == PAWN && sCol != dCol && board[dRow][dCol].piece == NONE) {
+        board[sRow][dCol].piece = NONE; // Remove piece behind
+        board[sRow][dCol].player = NONE;
+    }
+
+    // Castling:
+    // Piece is king, move is more than 1 column
+    else if (board[sRow][sCol].piece == KING && abs(sCol-dCol) > 1) {
+        // King side castle if king moves right
+        if (dCol > sCol) {
+            // Move rook to left of king
+            move_piece(sCol+3, sY, dCol-1, dY);
+        }
+        else {
+            // Move rook to right of king
+            move_piece(sCol-4, sY, dCol+1, dY);
+        }
+    }
+
+    board[dRow][dCol].piece = board[sRow][sCol].piece;
+    board[sRow][sCol].piece = NONE;
+
+    board[dRow][dCol].player = board[sRow][sCol].player;
+    board[sRow][sCol].player = NONE;
 }
 
 void setup_board_gpio() {
@@ -244,5 +325,6 @@ void setup_board_gpio() {
 
 void setup_board() {
     setup_board_gpio();
-    init_board();
+    init_board_default();
+    write_blank_board();
 }
