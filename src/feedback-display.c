@@ -29,21 +29,18 @@ char *time_to_string(int time_int) {
     return time_str;
 }
 
-void write_time_to_feedback_display(int time, char *align_vertical,
-        char *align_horizontal) {
+void write_time_to_feedback_display(int time, char *align_vertical, char *align_horizontal) {
     char *time_str = time_to_string(time);
     char *prev_time_str = time_to_string(time + 1);
 
-    clear_feedback_display_portion(strlen(prev_time_str), align_vertical,
-            align_horizontal);
+    clear_feedback_display_portion(strlen(prev_time_str), align_vertical, align_horizontal);
     write_to_feedback_display(time_str, align_vertical, align_horizontal);
 
     free(time_str);
     free(prev_time_str);
 }
 
-void write_move_to_feedback_display(int sX, int sY, int dX, int dY,
-        char *align_vertical, char *align_horizontal) {
+void write_move_to_feedback_display(int sX, int sY, int dX, int dY, char *align_vertical, char *align_horizontal) {
     // sX, sY: Source X and Y coordinates
     // dX, dY: Destination X and Y coordinates
 
@@ -52,11 +49,51 @@ void write_move_to_feedback_display(int sX, int sY, int dX, int dY,
 
     char command[16];
     sprintf(command, "%c%d to %c%d", sFile, sY + 1, dFile, dY + 1);
-    write_to_feedback_display(command, align_vertical, align_horizontal);
+    overwrite_to_feedback_display(command, align_vertical, align_horizontal);
 }
 
-void write_to_feedback_display(char *text, char *align_vertical,
-        char *align_horizontal) {
+void write_feedback_from_code(FeedbackCode code, char *align_vertical, char *align_horizontal) {
+    if (code == MATE_WHITE_WINS) {
+        overwrite_to_feedback_display("Checkmate!", "top", "center");
+        overwrite_to_feedback_display("White wins!", "bottom", "center");
+    } else if (code == MATE_BLACK_WINS) {
+        overwrite_to_feedback_display("Checkmate!", "top", "center");
+        overwrite_to_feedback_display("Black wins!", "bottom", "center");
+    } else if (code == TIME_OUT_WHITE_WINS) {
+        overwrite_to_feedback_display("Time out!", "top", "center");
+        overwrite_to_feedback_display("White wins!", "bottom", "center");
+    } else if (code == TIME_OUT_BLACK_WINS) {
+        overwrite_to_feedback_display("Time out!", "top", "center");
+        overwrite_to_feedback_display("Black wins!", "bottom", "center");
+    } else if (code == DRAW_STALEMATE) {
+        overwrite_to_feedback_display("Draw by", "top", "center");
+        overwrite_to_feedback_display("Stalemate!", "bottom", "center");
+    } else if (code == DRAW_INSUFFICIENT) {
+        overwrite_to_feedback_display("Draw by", "top", "center");
+        overwrite_to_feedback_display("Insufficient!", "bottom", "center");
+    } else if (code == DRAW_REPETITION) {
+        overwrite_to_feedback_display("Draw by", "top", "center");
+        overwrite_to_feedback_display("Repetition!", "bottom", "center");
+    } else if (code == SET_TIMERS) {
+        overwrite_to_feedback_display("Set timers", "bottom", "center");
+    } else if (code == WHITES_TURN) {
+        overwrite_to_feedback_display("White's turn", "bottom", "center");
+    } else if (code == BLACKS_TURN) {
+        overwrite_to_feedback_display("Black's turn", "bottom", "center");
+    } else if (code == PRESS_CONFIRM) {
+        overwrite_to_feedback_display("Press confirm", "bottom", "center");
+    } else if (code == ILLEGAL_MOVE) {
+        overwrite_to_feedback_display("Illegal move!", "bottom", "center");
+    }
+}
+
+void overwrite_to_feedback_display(char *text, char *align_vertical, char *align_horizontal) {
+    // Overwrite an entire row
+    clear_feedback_display_portion(16, align_vertical, align_horizontal);
+    write_to_feedback_display(text, align_vertical, align_horizontal);
+}
+
+void write_to_feedback_display(char *text, char *align_vertical, char *align_horizontal) {
     // Input Arguments:
     // text - The text to be displayed
     // align_vertical - "top" to write in top row, "bottom" to write in bottom row

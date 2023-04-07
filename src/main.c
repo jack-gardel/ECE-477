@@ -58,7 +58,7 @@ void EXTI0_1_IRQHandler()
             send_record();
         else if (gameState == GOT_MOVE) {
             sX, sY, dX, dY = 9;
-            write_to_feedback_display("                ", "bottom", "center");
+            clear_feedback_display_portion(16, "bottom", "center");
             send_record();
             gameState = AWAIT_MOVE;
         }
@@ -72,12 +72,12 @@ void EXTI2_3_IRQHandler()
 {
     if (!hold)
     {
-        if (gameState == SETUP)
+        if (gameState == SETUP) {
             gameState = AWAIT_MOVE;
-        else if (gameState == GOT_MOVE) {
+            send_confirm();
+        } else if (gameState == GOT_MOVE) {
             move_piece(sX, sY, dX, dY);
             sX, sY, dX, dY = 9;
-            write_to_feedback_display("                ", "bottom", "center");
             playerTurn = playerTurn == PLAYER_WHITE ? PLAYER_BLACK : PLAYER_WHITE;
             send_confirm();
             gameState = AWAIT_MOVE;
@@ -165,13 +165,15 @@ void TIM6_DAC_IRQHandler()
     TIM6->SR &= ~TIM_SR_UIF;
 
     // Update timers
-    write_time_to_feedback_display(timer[PLAYER_WHITE], "top", "left");
-    write_time_to_feedback_display(timer[PLAYER_BLACK], "top", "right");
-    if (gameState != SETUP) {
-        if (playerTurn == PLAYER_WHITE && timer[PLAYER_WHITE] >= 0)
-            timer[PLAYER_WHITE]--;
-        else if (playerTurn == PLAYER_BLACK && timer[PLAYER_BLACK] >= 0)
-            timer[PLAYER_BLACK]--;
+    if (gameState != GAME_OVER) {
+        write_time_to_feedback_display(timer[PLAYER_WHITE], "top", "left");
+        write_time_to_feedback_display(timer[PLAYER_BLACK], "top", "right");
+        if (gameState != SETUP) {
+            if (playerTurn == PLAYER_WHITE && timer[PLAYER_WHITE] >= 0)
+                timer[PLAYER_WHITE]--;
+            else if (playerTurn == PLAYER_BLACK && timer[PLAYER_BLACK] >= 0)
+                timer[PLAYER_BLACK]--;
+        }
     }
 
     // Turn off button hold
@@ -188,16 +190,14 @@ void TIM7_IRQHandler() {
 }
 
 void USART1_IRQHandler() {
-    int signal = USART1->RDR & 0xFF;
-    enum CommRecv code = signal >> 6;
-    int X = (signal >> 3) & 0x7;
-    int Y = signal & 0x7;
+    uint8_t signal = USART1->RDR & 0xFF;
+    enum CommRecv type = signal >> 6;
 
-    if (code == RDY) {
+    if (type == RDY) {
         //ready();
         ready = true;
-    } else if (code == FDBK) {
-        // Feedback
+    } else if (type == FDBK) {
+        write_feedback_from_code(signal & 0x3f, "bottom", "center");
     } else if (gameState == SETUP) {
         // If in setup state, add received piece to board
         add_piece_to_board(numPieceRecv++, signal);
@@ -205,10 +205,12 @@ void USART1_IRQHandler() {
             numPieceRecv = 0;
         }
     } else {
-        if (code == SRC) {
+        int X = (signal >> 3) & 0x7;
+        int Y = signal & 0x7;
+        if (type == SRC) {
             sX = X;
             sY = Y;
-        } else if (code == DST) {
+        } else if (type == DST) {
             dX = X;
             dY = Y;
         }
