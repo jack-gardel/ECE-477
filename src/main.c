@@ -5,14 +5,18 @@
 #include "board.h"
 #include "uart-jetson.h"
 
-enum Player {PLAYER_WHITE, PLAYER_BLACK};
-
+// Global variables
 int timer[2];
 int timerPrec = 10; // Timer precision
 
-bool init = true;
-bool game = false;
+enum PlayerTurn {PLAYER_WHITE, PLAYER_BLACK};
+enum PlayerTurn playerTurn = PLAYER_WHITE;
+
+enum GameState {SETUP, AWAIT_MOVE, GOT_MOVE, GAME_OVER};
+enum GameState gameState = SETUP;
+
 bool hold = false;
+
 int sX = 9;
 int sY = 9;
 int dX = 9;
@@ -21,7 +25,6 @@ int dY = 9;
 bool confirm = false;
 bool undo = false;
 bool conDeny = false;
-int playerTurn = PLAYER_WHITE;
 
 bool ready = false;
 
@@ -65,17 +68,16 @@ void EXTI0_1_IRQHandler()
         send_record();
     }
     hold = true;
-    EXTI->PR |= EXTI_PR_PR0;
+    EXTI->PR |= EXTI_PR_PR1;
 }
 
 // Confirm Button
 void EXTI2_3_IRQHandler()
 {
-    EXTI->PR |= EXTI_PR_PR3;
     if (!hold)
     {
-        if (init)
-            init = false;
+        if (gameState == SETUP)
+            gameState = AWAIT_MOVE;
         else if (conDeny) {
             confirm = true;
             conDeny = false;
@@ -86,27 +88,25 @@ void EXTI2_3_IRQHandler()
         }
     }
     hold = true;
+    EXTI->PR |= EXTI_PR_PR3;
 }
 
 // Timer Up/Down Button
 void EXTI4_15_IRQHandler()
 {
-    if(init && !hold)
-    {
-        if(((EXTI->PR & (0x1 << 13)) >> 13) == 1)
-        {
-            if (timer[PLAYER_WHITE] < 99 * 60 * timerPrec)
-            {
-                timer[PLAYER_WHITE] = timer[PLAYER_WHITE] + 60 * timerPrec;
-                timer[PLAYER_BLACK] = timer[PLAYER_BLACK] + 60 * timerPrec;
-            }
-        }
-        else if (((EXTI->PR & (0x1 << 10)) >> 10) == 1)
-        {
-            if (timer[PLAYER_WHITE] >= 60 * timerPrec)
-            {
-                timer[PLAYER_WHITE] = timer[PLAYER_WHITE] - 60 * timerPrec;
-                timer[PLAYER_BLACK] = timer[PLAYER_BLACK] - 60 * timerPrec;
+    if(!hold) {
+        if (gameState == SETUP) {
+            // Increase or decrease timers
+            if (EXTI->PR & EXTI_PR_PR13) {
+                if (timer[PLAYER_WHITE] < 99 * 60 * timerPrec) {
+                    timer[PLAYER_WHITE] = timer[PLAYER_WHITE] + 60 * timerPrec;
+                    timer[PLAYER_BLACK] = timer[PLAYER_BLACK] + 60 * timerPrec;
+                }
+            } else if (EXTI->PR & EXTI_PR_PR10) {
+                if (timer[PLAYER_WHITE] >= 60 * timerPrec) {
+                    timer[PLAYER_WHITE] = timer[PLAYER_WHITE] - 60 * timerPrec;
+                    timer[PLAYER_BLACK] = timer[PLAYER_BLACK] - 60 * timerPrec;
+                }
             }
         }
     }
@@ -114,6 +114,7 @@ void EXTI4_15_IRQHandler()
     EXTI->PR |= EXTI_PR_PR10 | EXTI_PR_PR13;
 }
 
+// Timer for updating game timers
 void init_tim6(void)
 {
     timer[PLAYER_WHITE] = (int) 600 * timerPrec;
@@ -138,6 +139,7 @@ void init_tim6(void)
     TIM6->CR1 |= TIM_CR1_CEN;
 }
 
+// Timer for board refresh
 void init_tim7(void)
 {
     // Enable Clock
@@ -165,6 +167,7 @@ void requestConfirm()
     conDeny = true;
 }
 
+// Timer interrupt (also turns off button hold)
 void TIM6_DAC_IRQHandler()
 {
     TIM6->SR &= ~TIM_SR_UIF;
@@ -172,10 +175,12 @@ void TIM6_DAC_IRQHandler()
     // Update timers
     write_time_to_feedback_display(timer[PLAYER_WHITE], "top", "left");
     write_time_to_feedback_display(timer[PLAYER_BLACK], "top", "right");
-    if (playerTurn == PLAYER_WHITE && timer[PLAYER_WHITE] >= 0 && !init)
-        timer[PLAYER_WHITE]--;
-    else if (playerTurn == PLAYER_BLACK && timer[PLAYER_BLACK] >= 0 && !init)
-        timer[PLAYER_BLACK]--;
+    if (gameState != SETUP) {
+        if (playerTurn == PLAYER_WHITE && timer[PLAYER_WHITE] >= 0)
+            timer[PLAYER_WHITE]--;
+        else if (playerTurn == PLAYER_BLACK && timer[PLAYER_BLACK] >= 0)
+            timer[PLAYER_BLACK]--;
+    }
 
     // Turn off button hold
     hold = false;
@@ -206,15 +211,13 @@ void TIM6_DAC_IRQHandler()
     undo = false;
 }
 
-void TIM7_IRQHandler() // LED DISPLAY
-{
+// Board refresh interrupt
+void TIM7_IRQHandler() {
     TIM7->SR &= ~TIM_SR_UIF;
-    if(!init)
-    {
-        write_board();
-    }
-    else
+    if (gameState == SETUP)
         write_blank_board();
+    else
+        write_board();
 }
 
 void USART1_IRQHandler() {
@@ -232,7 +235,7 @@ void USART1_IRQHandler() {
     {
         //notReady();
     }
-    else if (init) {
+    else if (gameState == SETUP) {
         // If in setup state, add received piece to board
         add_piece_to_board(numPieceRecv++, signal);
         if (numPieceRecv >= 64) {
