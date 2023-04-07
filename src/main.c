@@ -8,9 +8,10 @@
 enum Player {PLAYER_WHITE, PLAYER_BLACK};
 
 int timer[2];
-timerPrec = 1; // Timer precision
+int timerPrec = 10; // Timer precision
 
 bool init = true;
+bool game = false;
 bool hold = false;
 int sX = 9;
 int sY = 9;
@@ -36,21 +37,24 @@ void config_buttons()
 {
     // Configure button Interrupts
     RCC->APB2ENR |= RCC_APB2ENR_SYSCFGCOMPEN;
-    EXTI->IMR |= EXTI_IMR_MR0 | EXTI_IMR_MR3 | EXTI_IMR_MR10 | EXTI_IMR_MR13;
-    EXTI->RTSR |= EXTI_RTSR_TR0 | EXTI_RTSR_TR3 | EXTI_RTSR_TR10 | EXTI_RTSR_TR13;
-    SYSCFG->EXTICR[0] |= 0x2002;
-    SYSCFG->EXTICR[2] |= 0x200;
-    SYSCFG->EXTICR[3] |= 0x20;
+    EXTI->IMR |= EXTI_IMR_MR1 | EXTI_IMR_MR3 | EXTI_IMR_MR10 | EXTI_IMR_MR13;
+    EXTI->RTSR |= EXTI_RTSR_TR1 | EXTI_RTSR_TR3 | EXTI_RTSR_TR10 | EXTI_RTSR_TR13;
+
+    SYSCFG->EXTICR[0] &= ~(SYSCFG_EXTICR1_EXTI1 | SYSCFG_EXTICR1_EXTI3);
+    SYSCFG->EXTICR[0] = SYSCFG_EXTICR1_EXTI1_PC | SYSCFG_EXTICR1_EXTI3_PC;
+    SYSCFG->EXTICR[2] &= ~SYSCFG_EXTICR3_EXTI10;
+    SYSCFG->EXTICR[2] |= SYSCFG_EXTICR3_EXTI10_PC;
+    SYSCFG->EXTICR[3] &= ~SYSCFG_EXTICR4_EXTI13;
+    SYSCFG->EXTICR[3] |= SYSCFG_EXTICR4_EXTI13_PC;
+
     NVIC->ISER[0] |= 1 << EXTI0_1_IRQn;
     NVIC->ISER[0] |= 1 << EXTI2_3_IRQn;
     NVIC->ISER[0] |= 1 << EXTI4_15_IRQn;
 }
 
-
 // Record Button
 void EXTI0_1_IRQHandler()
 {
-    EXTI->PR |= EXTI_PR_PR0;
     if (!hold)
     {
         if (conDeny)
@@ -61,6 +65,7 @@ void EXTI0_1_IRQHandler()
         send_record();
     }
     hold = true;
+    EXTI->PR |= EXTI_PR_PR0;
 }
 
 // Confirm Button
@@ -71,13 +76,14 @@ void EXTI2_3_IRQHandler()
     {
         if (init)
             init = false;
-        else
-            if (conDeny)
-            {
-                confirm = true;
-                conDeny = false;
-                playerTurn = !playerTurn;
-            }
+        else if (conDeny) {
+            confirm = true;
+            conDeny = false;
+            if (playerTurn == PLAYER_WHITE)
+                playerTurn = PLAYER_BLACK;
+            else
+                playerTurn = PLAYER_WHITE;
+        }
     }
     hold = true;
 }
@@ -110,6 +116,9 @@ void EXTI4_15_IRQHandler()
 
 void init_tim6(void)
 {
+    timer[PLAYER_WHITE] = (int) 600 * timerPrec;
+    timer[PLAYER_BLACK] = (int) 600 * timerPrec;
+
     // Enable Clock
     RCC->APB1ENR |= RCC_APB1ENR_TIM6EN;
 
@@ -131,9 +140,6 @@ void init_tim6(void)
 
 void init_tim7(void)
 {
-    timer[PLAYER_WHITE] = (int) 600;
-    timer[PLAYER_BLACK] = (int) 600;
-
     // Enable Clock
     RCC->APB1ENR |= RCC_APB1ENR_TIM7EN;
 
@@ -153,37 +159,25 @@ void init_tim7(void)
     TIM7->CR1 |= TIM_CR1_CEN;
 }
 
-char command[16];
 void requestConfirm()
 {
     write_move_to_feedback_display(sX, sY, dX, dY, "bottom", "center");
     conDeny = true;
 }
 
-void TIM6_DAC_IRQHandler() // LCD TEXT DISPLAY
+void TIM6_DAC_IRQHandler()
 {
     TIM6->SR &= ~TIM_SR_UIF;
-    if (playerTurn == PLAYER_WHITE)
-    {
-        if (timer[PLAYER_WHITE] >= 0)
-        {
-            write_time_to_feedback_display(timer[PLAYER_WHITE], "top", "left");
-            write_time_to_feedback_display(timer[PLAYER_BLACK], "top", "right");
-            if (!init)
-                timer[PLAYER_WHITE]--;
-        }
-    }
-    else
-    {
-        if (timer[PLAYER_BLACK] >= 0)
-        {
-            write_time_to_feedback_display(timer[PLAYER_WHITE], "top", "left");
-            write_time_to_feedback_display(timer[PLAYER_BLACK], "top", "right");
-            if (!init)
-                timer[PLAYER_BLACK]--;
-        }
-    }
 
+    // Update timers
+    write_time_to_feedback_display(timer[PLAYER_WHITE], "top", "left");
+    write_time_to_feedback_display(timer[PLAYER_BLACK], "top", "right");
+    if (playerTurn == PLAYER_WHITE && timer[PLAYER_WHITE] >= 0 && !init)
+        timer[PLAYER_WHITE]--;
+    else if (playerTurn == PLAYER_BLACK && timer[PLAYER_BLACK] >= 0 && !init)
+        timer[PLAYER_BLACK]--;
+
+    // Turn off button hold
     hold = false;
 
     if(sX < 8 && sY < 8 && dX < 8 && dY < 8)
@@ -221,8 +215,6 @@ void TIM7_IRQHandler() // LED DISPLAY
     }
     else
         write_blank_board();
-
-//    hold = false;
 }
 
 void USART1_IRQHandler() {
@@ -240,14 +232,11 @@ void USART1_IRQHandler() {
     {
         //notReady();
     }
-    // Portotype code for setting up the board to a desired position
-    // for testing purposes
     else if (init) {
         // If in setup state, add received piece to board
         add_piece_to_board(numPieceRecv++, signal);
         if (numPieceRecv >= 64) {
             numPieceRecv = 0;
-            write_to_feedback_display("Board received!", "bottom", "center");
         }
     } else {
         if (code == 0)
