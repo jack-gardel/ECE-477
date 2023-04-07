@@ -7,7 +7,7 @@ enum Color {
     YELLOW=0x3, PURPLE=0x5, TEAL=0x6
 };
 
-enum Piece {NONE, PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING};
+enum Piece {NONE=0, PAWN=1, KNIGHT=2, BISHOP=3, ROOK=4, QUEEN=5, KING=6};
 
 typedef struct {
     int player;

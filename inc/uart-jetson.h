@@ -3,7 +3,8 @@
 
 #include <stdbool.h>
 
-enum Comm {REC, CFM, SHTDWN};
+enum CommSend {REC=0, CFM=1, SHTDWN=2, TIMOUT=3};
+enum CommRecv {SRC=0, DST=1, FDBK=2, RDY=3};
 
 extern bool ready;
 
