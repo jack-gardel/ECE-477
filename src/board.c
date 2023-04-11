@@ -279,8 +279,31 @@ void setup_board_gpio() {
     GPIOB->BRR = 0xFFFF;
 }
 
+// Timer for board refresh
+void init_tim7(void)
+{
+    // Enable Clock
+    RCC->APB1ENR |= RCC_APB1ENR_TIM7EN;
+
+    // Set frequency
+    int freq = 120; // Frequency (Hz)
+    int psc = 4800;
+    int arr = (48000000/psc) / freq;
+    TIM7->PSC = psc-1;
+    TIM7->ARR = arr-1;
+
+    // Enable interrupt
+    TIM7->DIER |= TIM_DIER_UIE;
+    NVIC_SetPriority(TIM7_IRQn, 1);
+    NVIC->ISER[0] |= 1 << TIM7_IRQn;
+
+    // Enable timer
+    TIM7->CR1 |= TIM_CR1_CEN;
+}
+
 void setup_board() {
     setup_board_gpio();
     init_board_default();
     write_blank_board();
+    init_tim7();
 }

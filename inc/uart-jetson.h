@@ -12,6 +12,7 @@ void send_byte(int byteToSend);
 void send_record();
 void send_confirm();
 void send_shutdown();
+void send_timeout();
 void setup_uart_jetson();
 
 #endif

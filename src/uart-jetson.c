@@ -19,6 +19,10 @@ void send_shutdown() {
     send_byte(SHTDWN << 6);
 }
 
+void send_timeout() {
+    send_byte(TIMOUT << 6);
+}
+
 void wait_for_ready() {
     while (!ready) {
     }
